@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceX</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #000; color: #e7e9ea; max-width: 600px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 60px; border-left: 1px solid #2f3336; border-right: 1px solid #2f3336; }
+        
+        /* Top Navigation (Matches Image) */
+        header { position: sticky; top: 0; background: rgba(0,0,0,0.85); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 1px solid #2f3336; z-index: 10; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; }
+        .top-bar-left { display: flex; align-items: center; gap: 15px; }
+        .profile-pic { width: 32px; height: 32px; border-radius: 50%; background: #333; object-fit: cover; }
+        .brand { font-size: 22px; font-weight: 700; }
+        .btn-subscribe { background: transparent; border: 1px solid #536471; color: #fff; border-radius: 9999px; padding: 6px 16px; font-weight: bold; font-size: 14px; cursor: pointer; }
+        
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 1px solid #2f3336; overflow-x: auto; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab { padding: 16px; font-weight: bold; color: #71767b; cursor: pointer; position: relative; white-space: nowrap; flex: 1; text-align: center; }
+        .tab.active { color: #fff; }
+        .tab.active::after { content: ''; position: absolute; bottom: 0; left: 25%; width: 50%; height: 4px; background: #1d9bf0; border-radius: 2px; }
+        
+        /* Show Posts Pill */
+        .show-posts-pill { text-align: center; padding: 12px; color: #1d9bf0; font-size: 15px; border-bottom: 1px solid #2f3336; cursor: pointer; }
+
+        /* Feed & Posts */
+        .post { display: flex; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #2f3336; cursor: pointer; transition: background 0.2s; }
+        .post:hover { background: rgba(255,255,255,0.03); }
+        .post-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+        .post-content { flex: 1; min-width: 0; }
+        .post-header { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; flex-wrap: wrap; }
+        .author-name { font-weight: 700; color: #fff; font-size: 15px; }
+        .author-handle, .post-time { color: #71767b; font-size: 15px; }
+        .repost-badge { color: #71767b; font-size: 13px; font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+        
+        /* Audio Player Styling */
+        audio { width: 100%; height: 35px; outline: none; margin: 8px 0; border-radius: 8px; }
+        audio::-webkit-media-controls-panel { background-color: #16181c; }
+        audio::-webkit-media-controls-current-time-display, audio::-webkit-media-controls-time-remaining-display { color: #fff; }
+
+        /* Action Bar */
+        .actions { display: flex; justify-content: space-between; max-width: 425px; margin-top: 8px; }
+        .action-item { display: flex; align-items: center; gap: 6px; color: #71767b; font-size: 13px; cursor: pointer; background: none; border: none; padding: 4px; }
+        .action-item:hover { color: #1d9bf0; }
+        .action-item.repost.active { color: #00ba7c; }
+        .action-item.like.active { color: #f91880; }
+
+        /* Comments/Replies */
+        .comments-section { border-left: 2px solid #333; margin-top: 10px; padding-left: 10px; }
+        
+        /* Floating Action Button (FAB) */
+        .fab { position: fixed; bottom: 80px; right: 20px; width: 56px; height: 56px; background: #1d9bf0; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; color: white; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(29, 155, 240, 0.4); z-index: 100; transition: transform 0.2s; }
+        .fab.recording { background: #f4212e; animation: pulse 1s infinite alternate; }
+
+        /* Bottom Navigation */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; max-width: 600px; background: #000; border-top: 1px solid #2f3336; display: flex; justify-content: space-around; padding: 12px 0; z-index: 50; }
+        .nav-icon { font-size: 22px; color: #e7e9ea; cursor: pointer; }
+
+        /* Auth Screen */
+        .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .auth-box { width: 100%; max-width: 400px; }
+        .auth-box input { width: 100%; background: #000; border: 1px solid #333; color: white; padding: 16px; border-radius: 4px; margin-bottom: 16px; font-size: 16px; }
+        .btn-auth { width: 100%; background: #eff3f4; color: #0f1419; border: none; border-radius: 9999px; padding: 14px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 12px; }
+
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+        .hidden { display: none !important; }
+
+        /* Auth Screen Styles */
+        .auth-title { margin-bottom: 30px; font-size: 32px; }
+        .auth-subtitle { margin-bottom: 20px; }
+        .btn-auth-secondary { background: transparent; border: 1px solid #536471; color: #1d9bf0; }
+        .auth-error { color: #f4212e; text-align: center; margin-top: 10px; }
+
+        /* Chat Toggle & UI */
+        .chat-mode-toggle { display: flex; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #2f3336; }
+        .chat-mode-btn { flex: 1; padding: 8px; background: transparent; border: 1px solid #536471; color: #71767b; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .chat-mode-btn.active { background: #1d9bf0; color: #fff; border-color: #1d9bf0; }
+
+        /* Text Message Input */
+        .text-input-container { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #2f3336; }
+        .text-input-container input { flex: 1; background: #000; border: 1px solid #333; color: #fff; padding: 10px 12px; border-radius: 20px; font-size: 14px; }
+        .text-input-container button { background: #1d9bf0; color: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 16px; }
+        .text-input-container button:hover { background: #1a8cd8; }
+
+        /* Chat Message Styles */
+        .chat-message { display: flex; gap: 8px; padding: 12px 16px; margin-bottom: 8px; }
+        .chat-message.sent { justify-content: flex-end; }
+        .chat-message.received { justify-content: flex-start; }
+        .message-bubble { max-width: 70%; padding: 10px 14px; border-radius: 18px; word-wrap: break-word; }
+        .message-bubble.sent { background: #1d9bf0; color: white; border-radius: 18px 4px 18px 18px; }
+        .message-bubble.received { background: #2f3336; color: #e7e9ea; border-radius: 4px 18px 18px 18px; }
+        .message-time { font-size: 12px; color: #71767b; margin-top: 4px; }
+
+        /* Follow/Unfollow button */
+        .follow-btn { background: transparent; border: 1px solid #536471; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+        .follow-btn.following { border-color: #f4212e; color: #f4212e; }
+        .follow-btn:hover { background: rgba(244, 33, 46, 0.1); }
+
+        /* Colorful Gradient Effects */
+        @keyframes gradient-shift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes glow { 0% { box-shadow: 0 0 10px rgba(29, 155, 240, 0.3); } 50% { box-shadow: 0 0 20px rgba(29, 155, 240, 0.6); } 100% { box-shadow: 0 0 10px rgba(29, 155, 240, 0.3); } }
+        @keyframes rainbow { 0% { color: #1d9bf0; } 25% { color: #f91880; } 50% { color: #00ba7c; } 75% { color: #ff6b1a; } 100% { color: #1d9bf0; } }
+        
+        .brand { animation: rainbow 6s infinite; }
+        .fab { background: linear-gradient(135deg, #1d9bf0, #ff6b1a, #f91880, #00ba7c); background-size: 300% 300%; animation: gradient-shift 4s ease infinite, glow 2s ease-in-out infinite; }
+
+        /* Notification Badge */
+        .notification-icon { position: relative; cursor: pointer; font-size: 22px; transition: transform 0.2s; }
+        .notification-icon:hover { transform: scale(1.2); }
+        .notification-badge { position: absolute; top: -8px; right: -8px; background: linear-gradient(135deg, #f91880, #ff6b1a); color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; }
+
+        /* Notification Panel */
+        .notification-panel { position: fixed; top: 60px; right: 10px; width: 320px; max-height: 500px; background: linear-gradient(135deg, #0f1419 0%, #1a1f2a 100%); border: 1px solid #2f3336; border-radius: 12px; box-shadow: 0 8px 32px rgba(29, 155, 240, 0.2); z-index: 999; overflow-y: auto; }
+        .notification-header { padding: 12px 16px; border-bottom: 1px solid #2f3336; font-weight: bold; color: #fff; }
+        .notification-item { padding: 12px 16px; border-bottom: 1px solid #1f2937; cursor: pointer; transition: background 0.2s; }
+        .notification-item:hover { background: rgba(29, 155, 240, 0.1); }
+        .notification-item.unread { background: rgba(29, 155, 240, 0.05); border-left: 3px solid #1d9bf0; }
+        .notification-text { font-size: 13px; color: #e7e9ea; margin-bottom: 4px; }
+        .notification-time { font-size: 12px; color: #71767b; }
+        .notification-empty { padding: 32px 16px; text-align: center; color: #71767b; }
+
+        /* Gradient Text for Actions */
+        .post { background: linear-gradient(90deg, rgba(29, 155, 240, 0.02) 0%, rgba(0, 186, 124, 0.02) 100%); }
+        .post:hover { background: linear-gradient(90deg, rgba(29, 155, 240, 0.05), rgba(0, 186, 124, 0.05)); }
+
+        /* Top Bar Right Section */
+        .top-bar-right { display: flex; gap: 10px; align-items: center; }
+
+        /* Profile Modal */
+        .profile-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+        .profile-modal.hidden { display: none !important; }
+        .profile-card { width: 95%; max-width: 500px; background: linear-gradient(135deg, #0f1419 0%, #1a1f2a 100%); border: 1px solid #2f3336; border-radius: 16px; padding: 24px; box-shadow: 0 12px 48px rgba(29, 155, 240, 0.3); animation: slideUp 0.3s ease-out; }
+
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .profile-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .profile-close-btn { background: none; border: none; color: #1d9bf0; font-size: 24px; cursor: pointer; }
+        .profile-close-btn:hover { color: #1a8cd8; }
+
+        .profile-avatar-large { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #1d9bf0, #f91880); object-fit: cover; margin-bottom: 16px; }
+
+        .profile-username { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+        .profile-handle { font-size: 14px; color: #71767b; margin-bottom: 16px; }
+
+        .profile-stats { display: flex; gap: 24px; margin-bottom: 20px; }
+        .stat { text-align: center; }
+        .stat-number { font-size: 18px; font-weight: 700; color: #1d9bf0; display: block; }
+        .stat-label { font-size: 13px; color: #71767b; }
+
+        .profile-posts-header { font-size: 16px; font-weight: 700; color: #fff; margin: 20px 0 12px 0; border-top: 1px solid #2f3336; padding-top: 20px; }
+        .profile-posts-list { max-height: 300px; overflow-y: auto; }
+        .profile-post-item { padding: 12px 0; border-bottom: 1px solid #1f2937; font-size: 14px; color: #e7e9ea; }
+        .profile-post-item:last-child { border-bottom: none; }
+
+        .profile-pic { cursor: pointer; transition: transform 0.2s; }
+        .profile-pic:hover { transform: scale(1.1); }
+    </style>
+</head>
+<body>
+
+    <!-- Auth Screen -->
+    <div id="authArea" class="auth-overlay">
+        <div class="auth-box">
+            <h1 class="auth-title">Happening now</h1>
+            <h2 class="auth-subtitle">Join VoiceX today.</h2>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button class="btn-auth" onclick="handleAuth('signup')">Create account</button>
+            <button class="btn-auth btn-auth-secondary" onclick="handleAuth('login')">Sign in</button>
+            <p id="authError" class="auth-error"></p>
+        </div>
+    </div>
+
+    <!-- Main App UI -->
+    <div id="appArea" class="hidden">
+        <header>
+            <div class="top-bar">
+                <div class="top-bar-left">
+                    <img id="myAvatar" class="profile-pic" src="" alt="Profile" onclick="openProfile()">
+                    <span class="brand">𝕏 Voice</span>
+                </div>
+                <div class="top-bar-right">
+                    <div id="notificationIcon" class="notification-icon" onclick="toggleNotificationPanel()">
+                        🔔
+                        <div id="notificationBadge" class="notification-badge hidden">0</div>
+                    </div>
+                    <button class="btn-subscribe" onclick="logout()">Log out</button>
+                </div>
+            </div>
+            <div class="tabs">
+                <div id="tabForYou" class="tab active" onclick="switchTab('foryou')">For you</div>
+                <div id="tabFollowing" class="tab" onclick="switchTab('following')">Following</div>
+                <div class="tab">Engineering</div>
+            </div>
+        </header>
+
+        <!-- Notification Panel -->
+        <div id="notificationPanel" class="notification-panel hidden">
+            <div class="notification-header">Notifications</div>
+            <div id="notificationsList"></div>
+        </div>
+
+        <div class="show-posts-pill" onclick="loadFeed()">Show new posts</div>
+
+        <!-- Chat Mode Toggle -->
+        <div class="chat-mode-toggle">
+            <button class="chat-mode-btn active" onclick="switchChatMode('voice')">🎙️ Voice</button>
+            <button class="chat-mode-btn" onclick="switchChatMode('text')">💬 Text</button>
+        </div>
+
+        <!-- Text Input Area (Hidden by default) -->
+        <div id="textInputArea" class="text-input-container hidden">
+            <input type="text" id="messageInput" placeholder="What's happening?!" maxlength="280">
+            <button onclick="sendTextMessage()">➤</button>
+        </div>
+
+        <div id="feed"></div>
+
+        <!-- Floating Action Button for Recording -->
+        <button id="fabRecord" class="fab">🎙️</button>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <span class="nav-icon" onclick="window.scrollTo(0,0)">🏠</span>
+            <span class="nav-icon">🔍</span>
+            <span class="nav-icon">💡</span>
+            <span class="nav-icon">🔔</span>
+            <span class="nav-icon">✉️</span>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="profile-modal hidden">
+        <div class="profile-card">
+            <div class="profile-header">
+                <div></div>
+                <button class="profile-close-btn" onclick="closeProfile()">✕</button>
+            </div>
+            <img id="profileAvatarLarge" class="profile-avatar-large" src="" alt="Profile">
+            <div class="profile-username" id="profileUsername"></div>
+            <div class="profile-handle" id="profileHandle"></div>
+            
+            <div class="profile-stats">
+                <div class="stat">
+                    <span class="stat-number" id="profileFollowing">0</span>
+                    <span class="stat-label">Following</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="profileFollowers">0</span>
+                    <span class="stat-label">Followers</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="profilePosts">0</span>
+                    <span class="stat-label">Posts</span>
+                </div>
+            </div>
+
+            <div class="profile-posts-header">My Posts</div>
+            <div class="profile-posts-list" id="profilePostsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'foryou';
+        let token = localStorage.getItem('token');
+        let currentUser = localStorage.getItem('username');
+        let myFollowing = [];
+        let chatMode = 'voice'; // 'voice' or 'text'
+        
+        let mediaRecorder;
+        let chunks = [];
+
+        // Check login status on load
+        if (token) initApp();
+
+        async function initApp() {
+            document.getElementById('authArea').classList.add('hidden');
+            document.getElementById('appArea').classList.remove('hidden');
+            document.getElementById('myAvatar').src = `https://ui-avatars.com/api/?name=${currentUser}&background=random`;
+            
+            await fetchMyProfile();
+            loadFeed();
+        }
+
+        // --- AUTH ---
+        async function handleAuth(action) {
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value.trim();
+            
+            const res = await fetch(`/api/auth/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('username', data.username);
+                token = data.token;
+                currentUser = data.username;
+                initApp();
+            } else {
+                document.getElementById('authError').innerText = data.error;
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        async function fetchMyProfile() {
+            const res = await fetch('/api/users/me', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const data = await res.json();
+                myFollowing = data.following;
+            }
+            // Fetch notifications after profile load
+            await fetchNotifications();
+        }
+
+        // --- PROFILE ---
+        async function openProfile() {
+            const modal = document.getElementById('profileModal');
+            modal.classList.remove('hidden');
+            
+            // Fetch profile data
+            try {
+                const res = await fetch('/api/users/me', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const userData = await res.json();
+                    
+                    // Update profile info
+                    document.getElementById('profileUsername').innerText = userData.username;
+                    document.getElementById('profileHandle').innerText = `@${userData.username.toLowerCase()}`;
+                    document.getElementById('profileFollowing').innerText = userData.following.length;
+                    document.getElementById('profileFollowers').innerText = userData.followers.length;
+                    document.getElementById('profileAvatarLarge').src = `https://ui-avatars.com/api/?name=${userData.username}&background=random`;
+                    
+                    // Fetch user's posts
+                    const postsRes = await fetch(`/api/users/${userData.username}/posts`, { 
+                        headers: { 'Authorization': `Bearer ${token}` } 
+                    });
+                    if (postsRes.ok) {
+                        const posts = await postsRes.json();
+                        document.getElementById('profilePosts').innerText = posts.length;
+                        
+                        const postsList = document.getElementById('profilePostsList');
+                        if (posts.length === 0) {
+                            postsList.innerHTML = '<div class="profile-post-item">No posts yet</div>';
+                        } else {
+                            postsList.innerHTML = posts.map(p => `
+                                <div class="profile-post-item">
+                                    ${p.text ? `<strong>${p.text}</strong>` : ''}
+                                    ${p.audioUrl ? '<br>🎙️ Voice post' : ''}
+                                    <div style="font-size: 12px; color: #71767b; margin-top: 4px;">${new Date(p.createdAt).toLocaleDateString()}</div>
+                                </div>
+                            `).join('');
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading profile:', err);
+            }
+        }
+
+        function closeProfile() {
+            document.getElementById('profileModal').classList.add('hidden');
+        }
+
+        // Close profile modal when clicking outside
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('profileModal');
+            if (e.target === modal) {
+                closeProfile();
+            }
+        });
+
+        // --- NOTIFICATIONS ---
+        async function fetchNotifications() {
+            try {
+                const res = await fetch('/api/notifications/unread-count', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    updateNotificationBadge(data.unreadCount);
+                }
+            } catch (err) {
+                console.error('Error fetching notifications:', err);
+            }
+        }
+
+        function updateNotificationBadge(count) {
+            const badge = document.getElementById('notificationBadge');
+            if (count > 0) {
+                badge.innerText = count > 9 ? '9+' : count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        async function toggleNotificationPanel() {
+            const panel = document.getElementById('notificationPanel');
+            panel.classList.toggle('hidden');
+            
+            if (!panel.classList.contains('hidden')) {
+                await loadNotificationsList();
+            }
+        }
+
+        async function loadNotificationsList() {
+            try {
+                const res = await fetch('/api/notifications', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const notifications = await res.json();
+                    const list = document.getElementById('notificationsList');
+                    
+                    if (notifications.length === 0) {
+                        list.innerHTML = '<div class="notification-empty">No notifications yet</div>';
+                    } else {
+                        list.innerHTML = notifications.map(n => `
+                            <div class="notification-item ${!n.read ? 'unread' : ''}" onclick="markNotificationRead('${n._id}')">
+                                <div class="notification-text">${n.message}</div>
+                                <div class="notification-time">${new Date(n.createdAt).toLocaleDateString()}</div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading notifications:', err);
+            }
+        }
+
+        async function markNotificationRead(notificationId) {
+            try {
+                await fetch(`/api/notifications/${notificationId}/read`, { 
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                await fetchNotifications();
+                await loadNotificationsList();
+            } catch (err) {
+                console.error('Error marking notification as read:', err);
+            }
+        }
+
+        // Auto-refresh notifications every 10 seconds
+        setInterval(() => {
+            if (token) fetchNotifications();
+        }, 10000);
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabForYou').classList.toggle('active', tab === 'foryou');
+            document.getElementById('tabFollowing').classList.toggle('active', tab === 'following');
+            loadFeed();
+        }
+
+        // --- LOAD FEED ---
+        async function loadFeed() {
+            const res = await fetch(`/api/posts?type=${currentTab}&user=${currentUser}`);
+            const posts = await res.json();
+            const feed = document.getElementById('feed');
+
+            feed.innerHTML = posts.map(p => {
+                const isFollowing = myFollowing.includes(p.author);
+                const isSelf = p.author === currentUser;
+                const hasLiked = p.likes?.includes(currentUser);
+                const hasReposted = p.reposts?.includes(currentUser);
+                const avatar = `https://ui-avatars.com/api/?name=${p.author}&background=random`;
+
+                return `
+                <div class="post">
+                    <img src="${avatar}" class="post-avatar">
+                    <div class="post-content">
+                        ${p.reposts?.length > 0 ? `<div class="repost-badge">🔁 ${p.reposts[0]} reposted</div>` : ''}
+                        
+                        <div class="post-header">
+                            <span class="author-name">${p.author}</span>
+                            <span class="author-handle">@${p.author.toLowerCase()}</span>
+                            <span class="post-time">· ${new Date(p.createdAt).toLocaleDateString()}</span>
+                            ${!isSelf ? `
+                                <button class="follow-btn ${isFollowing ? 'following' : ''}" 
+                                onclick="toggleFollow('${p.author}')">
+                                    ${isFollowing ? 'Unfollow' : 'Follow'}
+                                </button>
+                            ` : ''}
+                            ${isSelf ? `
+                                <button class="action-item" style="margin-left: auto; color: #f4212e;" onclick="deletePost('${p._id}')">
+                                    🗑️ Delete
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        ${p.text ? `<p style="margin: 10px 0; font-size: 15px;">${p.text}</p>` : ''}
+                        ${p.audioUrl ? `<audio controls src="${p.audioUrl}"></audio>` : ''}
+
+                        <div class="actions">
+                            <button class="action-item" onclick="replyComment('${p._id}', this)">
+                                💬 <span>${p.comments.length}</span>
+                            </button>
+                            <button class="action-item repost ${hasReposted ? 'active' : ''}" onclick="toggleInteraction('${p._id}', 'repost')">
+                                🔁 <span>${p.reposts?.length || 0}</span>
+                            </button>
+                            <button class="action-item like ${hasLiked ? 'active' : ''}" onclick="toggleInteraction('${p._id}', 'like')">
+                                ❤️ <span>${p.likes?.length || 0}</span>
+                            </button>
+                            <button class="action-item">📤</button>
+                        </div>
+
+                        ${p.comments.length > 0 ? `
+                        <div class="comments-section">
+                            ${p.comments.map((c, idx) => `
+                                <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                    <div class="post-header" style="font-size:13px;">
+                                        <span class="author-name">${c.author}</span>
+                                        <span class="author-handle">@${c.author.toLowerCase()}</span>
+                                        ${c.author === currentUser ? `
+                                            <button class="action-item" style="margin-left: auto; color: #f4212e; font-size: 12px;" onclick="deleteComment('${p._id}', ${idx})">
+                                                🗑️
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                    ${c.text ? `<p style="margin: 6px 0; font-size: 14px;">${c.text}</p>` : ''}
+                                    ${c.audioUrl ? `<audio controls src="${c.audioUrl}" style="height: 25px; margin-top:4px;"></audio>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // --- DELETE FUNCTIONS ---
+        async function deletePost(postId) {
+            if (confirm('Are you sure you want to delete this post?')) {
+                try {
+                    const res = await fetch(`/api/posts/${postId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        loadFeed();
+                    } else {
+                        alert('Failed to delete post');
+                    }
+                } catch (err) {
+                    console.error('Error deleting post:', err);
+                }
+            }
+        }
+
+        async function deleteComment(postId, commentIndex) {
+            if (confirm('Are you sure you want to delete this comment?')) {
+                try {
+                    const res = await fetch(`/api/posts/${postId}/comments/${commentIndex}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        loadFeed();
+                    } else {
+                        alert('Failed to delete comment');
+                    }
+                } catch (err) {
+                    console.error('Error deleting comment:', err);
+                }
+            }
+        }
+
+        // --- INTERACTIONS ---
+        async function toggleFollow(username) {
+            await fetch(`/api/users/${username}/follow`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }});
+            await fetchMyProfile();
+            loadFeed();
+        }
+
+        async function toggleInteraction(postId, type) {
+            await fetch(`/api/posts/${postId}/${type}`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }});
+            loadFeed();
+        }
+
+        // --- CHAT MODE SWITCHING ---
+        function switchChatMode(mode) {
+            chatMode = mode;
+            const buttons = document.querySelectorAll('.chat-mode-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const textInputArea = document.getElementById('textInputArea');
+            const fabRecord = document.getElementById('fabRecord');
+            
+            if (mode === 'text') {
+                textInputArea.classList.remove('hidden');
+                fabRecord.style.display = 'none';
+            } else {
+                textInputArea.classList.add('hidden');
+                fabRecord.style.display = 'flex';
+            }
+        }
+
+        // --- SEND TEXT MESSAGE ---
+        async function sendTextMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const text = messageInput.value.trim();
+            
+            if (!text) return;
+
+            try {
+                const res = await fetch('/api/posts/text', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({ text })
+                });
+
+                if (res.ok) {
+                    messageInput.value = '';
+                    loadFeed();
+                } else {
+                    alert('Failed to send message');
+                }
+            } catch (err) {
+                console.error('Error sending message:', err);
+            }
+        }
+
+        // Allow Enter key to send message
+        document.addEventListener('DOMContentLoaded', () => {
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') sendTextMessage();
+                });
+            }
+        });
+
+        // --- RECORDING (FAB) ---
+        const fab = document.getElementById('fabRecord');
+        let recordedAudioUrl = null;
+        let recordingState = 'ready'; // ready, recording, preview
+        
+        fab.addEventListener('mousedown', startRecord);
+        fab.addEventListener('mouseup', stopRecord);
+        fab.addEventListener('touchstart', startRecord);
+        fab.addEventListener('touchend', stopRecord);
+
+        async function startRecord(e) {
+            e.preventDefault();
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                chunks = [];
+
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    recordedAudioUrl = URL.createObjectURL(blob);
+                    recordingState = 'preview';
+                    showRecordingPreview(blob);
+                };
+
+                mediaRecorder.start();
+                fab.classList.add('recording');
+                recordingState = 'recording';
+            } catch (err) {
+                console.error('Microphone access denied:', err);
+                alert('Unable to access microphone');
+            }
+        }
+
+        function stopRecord(e) {
+            e.preventDefault();
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                fab.classList.remove('recording');
+            }
+        }
+
+        function showRecordingPreview(blob) {
+            // Create a temporary UI to preview the audio before posting
+            const preview = document.createElement('div');
+            preview.id = 'recordingPreview';
+            preview.style.cssText = `
+                position: fixed; 
+                bottom: 100px; 
+                right: 20px; 
+                background: linear-gradient(135deg, #1d9bf0, #f91880);
+                padding: 16px; 
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(29, 155, 240, 0.4);
+                z-index: 90;
+                max-width: 280px;
+            `;
+            
+            preview.innerHTML = `
+                <div style="color: white; margin-bottom: 10px; font-weight: bold;">🎙️ Your Recording</div>
+                <audio controls style="width: 100%; margin-bottom: 10px; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                    <source src="${recordedAudioUrl}" type="audio/webm">
+                </audio>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="postRecording()" style="flex: 1; background: #fff; color: #1d9bf0; border: none; border-radius: 20px; padding: 8px; font-weight: bold; cursor: pointer;">Post ✓</button>
+                    <button onclick="cancelRecording()" style="flex: 1; background: transparent; color: #fff; border: 1px solid #fff; border-radius: 20px; padding: 8px; font-weight: bold; cursor: pointer;">Cancel</button>
+                </div>
+            `;
+            
+            document.body.appendChild(preview);
+        }
+
+        async function postRecording() {
+            const preview = document.getElementById('recordingPreview');
+            if (preview) preview.remove();
+
+            if (chunks.length === 0) return;
+
+            try {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                const form = new FormData();
+                form.append('audio', blob);
+
+                const res = await fetch('/api/posts', { 
+                    method: 'POST', 
+                    headers: { 'Authorization': `Bearer ${token}` }, 
+                    body: form 
+                });
+
+                if (res.ok) {
+                    loadFeed();
+                    recordingState = 'ready';
+                } else {
+                    alert('Failed to post recording');
+                }
+            } catch (err) {
+                console.error('Error posting recording:', err);
+                alert('Error posting recording');
+            }
+        }
+
+        function cancelRecording() {
+            const preview = document.getElementById('recordingPreview');
+            if (preview) preview.remove();
+            
+            if (recordedAudioUrl) {
+                URL.revokeObjectURL(recordedAudioUrl);
+                recordedAudioUrl = null;
+            }
+            
+            recordingState = 'ready';
+            chunks = [];
+        }
+
+        // --- VOICE REPLIES ---
+        let replyRecorder, replyChunks = [];
+        let replyPostId = null;
+        let replyAudioUrl = null;
+
+        async function replyComment(postId, btn) {
+            if (chatMode === 'text') {
+                // Text reply mode
+                const replyText = prompt('Write your reply:');
+                if (replyText && replyText.trim()) {
+                    await fetch(`/api/posts/${postId}/comments`, { 
+                        method: 'POST', 
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}` 
+                        }, 
+                        body: JSON.stringify({ text: replyText.trim() })
+                    });
+                    loadFeed();
+                }
+                return;
+            }
+
+            // Voice reply mode
+            if (btn.innerText.includes("Stop")) {
+                if (replyRecorder && replyRecorder.state === "recording") {
+                    replyRecorder.stop();
+                    btn.innerText = "💬 Processing...";
+                }
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const options = { mimeType: 'audio/webm;codecs=opus' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) { 
+                    options.mimeType = 'audio/mp4';
+                }
+                replyRecorder = new MediaRecorder(stream, options);
+                replyChunks = [];
+                replyPostId = postId;
+                
+                replyRecorder.ondataavailable = e => replyChunks.push(e.data);
+                replyRecorder.onstop = async () => {
+                    const blob = new Blob(replyChunks, { type: 'audio/webm' });
+                    replyAudioUrl = URL.createObjectURL(blob);
+                    showReplyPreview(postId);
+                };
+                
+                replyRecorder.start();
+                btn.innerHTML = "<span style='color:#f4212e'>🛑 Stop</span>";
+            } catch (err) {
+                console.error('Microphone error:', err);
+                alert('Unable to access microphone');
+            }
+        }
+
+        function showReplyPreview(postId) {
+            const preview = document.createElement('div');
+            preview.id = 'replyPreview';
+            preview.style.cssText = `
+                position: fixed; 
+                bottom: 100px; 
+                right: 20px; 
+                background: linear-gradient(135deg, #00ba7c, #1d9bf0);
+                padding: 16px; 
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(0, 186, 124, 0.4);
+                z-index: 90;
+                max-width: 280px;
+            `;
+            
+            preview.innerHTML = `
+                <div style="color: white; margin-bottom: 10px; font-weight: bold;">💬 Reply Preview</div>
+                <audio controls style="width: 100%; margin-bottom: 10px; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                    <source src="${replyAudioUrl}" type="audio/webm">
+                </audio>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="postReply()" style="flex: 1; background: #fff; color: #00ba7c; border: none; border-radius: 20px; padding: 8px; font-weight: bold; cursor: pointer;">Reply ✓</button>
+                    <button onclick="cancelReply()" style="flex: 1; background: transparent; color: #fff; border: 1px solid #fff; border-radius: 20px; padding: 8px; font-weight: bold; cursor: pointer;">Cancel</button>
+                </div>
+            `;
+            
+            document.body.appendChild(preview);
+        }
+
+        async function postReply() {
+            const preview = document.getElementById('replyPreview');
+            if (preview) preview.remove();
+
+            if (replyChunks.length === 0 || !replyPostId) return;
+
+            try {
+                const form = new FormData();
+                form.append('audio', new Blob(replyChunks, { type: 'audio/webm' }));
+                const res = await fetch(`/api/posts/${replyPostId}/comments`, { 
+                    method: 'POST', 
+                    headers: { 'Authorization': `Bearer ${token}` }, 
+                    body: form 
+                });
+
+                if (res.ok) {
+                    loadFeed();
+                } else {
+                    alert('Failed to post reply');
+                }
+            } catch (err) {
+                console.error('Error posting reply:', err);
+                alert('Error posting reply');
+            }
+        }
+
+        function cancelReply() {
+            const preview = document.getElementById('replyPreview');
+            if (preview) preview.remove();
+            
+            if (replyAudioUrl) {
+                URL.revokeObjectURL(replyAudioUrl);
+                replyAudioUrl = null;
+            }
+            
+            replyChunks = [];
+            replyPostId = null;
+        }
+    </script>
+</body>
+</html>
